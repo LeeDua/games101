@@ -8,6 +8,12 @@
 #include <algorithm>
 #include "global.hpp"
 #include "Triangle.hpp"
+
+#define USE_SUPERSAMPLING 
+#ifdef USE_SUPERSAMPLING
+    #define SSRATE 16
+#endif
+
 using namespace Eigen;
 
 namespace rst
