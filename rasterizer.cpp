@@ -115,107 +115,15 @@ void rst::rasterizer::draw(pos_buf_id pos_buffer, ind_buf_id ind_buffer, col_buf
         t.setColor(2, col_z[0], col_z[1], col_z[2]);
 
         rasterize_triangle(t);
+
     }
-}
-
-void rst::rasterizer::draw_line(Eigen::Vector3f begin, Eigen::Vector3f end)
-{
-    auto x1 = begin.x();
-    auto y1 = begin.y();
-    auto x2 = end.x();
-    auto y2 = end.y();
-
-    Eigen::Vector3f line_color = {255, 0, 0};
-
-    int x,y,dx,dy,dx1,dy1,px,py,xe,ye,i;
-
-    dx=x2-x1;
-    dy=y2-y1;
-    dx1=fabs(dx);
-    dy1=fabs(dy);
-    px=2*dy1-dx1;
-    py=2*dx1-dy1;
-
-    if(dy1<=dx1)
-    {
-        if(dx>=0)
-        {
-            x=x1;
-            y=y1;
-            xe=x2;
+    #ifdef USE_SUPERSAMPLING
+    for(int j=0;j<height*ssrate;j++){
+        for(int i=0;i<width*ssrate;i++){          
+            frame_buf[(int)(i/ssrate)+(int)(j/ssrate)*width] += ss_frame_buf[i+j*width*ssrate]/(float)(ssrate*ssrate);
         }
-        else
-        {
-            x=x2;
-            y=y2;
-            xe=x1;
-        }
-        Eigen::Vector3f point = Eigen::Vector3f(x, y, 1.0f);
-        set_pixel(point,line_color);
-        for(i=0;x<xe;i++)
-        {
-            x=x+1;
-            if(px<0)
-            {
-                px=px+2*dy1;
-            }
-            else
-            {
-                if((dx<0 && dy<0) || (dx>0 && dy>0))
-                {
-                    y=y+1;
-                }
-                else
-                {
-                    y=y-1;
-                }
-                px=px+2*(dy1-dx1);
-            }
-//            delay(0);
-            Eigen::Vector3f point = Eigen::Vector3f(x, y, 1.0f);
-            set_pixel(point,line_color);
-        }
-    }
-    else
-    {
-        if(dy>=0)
-        {
-            x=x1;
-            y=y1;
-            ye=y2;
-        }
-        else
-        {
-            x=x2;
-            y=y2;
-            ye=y1;
-        }
-        Eigen::Vector3f point = Eigen::Vector3f(x, y, 1.0f);
-        set_pixel(point,line_color);
-        for(i=0;y<ye;i++)
-        {
-            y=y+1;
-            if(py<=0)
-            {
-                py=py+2*dx1;
-            }
-            else
-            {
-                if((dx<0 && dy<0) || (dx>0 && dy>0))
-                {
-                    x=x+1;
-                }
-                else
-                {
-                    x=x-1;
-                }
-                py=py+2*(dx1-dy1);
-            }
-//            delay(0);
-            Eigen::Vector3f point = Eigen::Vector3f(x, y, 1.0f);
-            set_pixel(point,line_color);
-        }
-    }
+    }  
+    #endif
 }
 
 //Screen space rasterization
@@ -243,51 +151,30 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
     
 
 #ifdef USE_SUPERSAMPLING
-    float rate = sqrt(SSRATE);
-    float step = 1/rate;
+    float step = 1.0/(float)ssrate;
     xptr = std::floor(minX) + 0.5*step;
     yptr = std::floor(minY) + 0.5*step;
     while(yptr < maxY){
-        // std::cout << "X,Y: " << xptr << " " << yptr << std::endl;
-        int ptsInside = 0;
-        int count = 0;
         float nextX = std::ceil(xptr);
         float nextY = std::ceil(yptr);
-        bool overideColor = false;
-        while(yptr < nextY){
-            count ++;
-            // std::cout << "X,Y: " << xptr << " " << yptr << std::endl;
-            if(insideTriangle(xptr, yptr, t.v)){
-                ptsInside++;
-                auto[alpha, beta, gamma] = computeBarycentric2D(xptr, yptr, t.v);
-                float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-                float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-                z_interpolated *= -w_reciprocal;
-                int index = get_index(xptr, yptr); 
-                if(z_interpolated < depth_buf[index]){
-                    depth_buf[index] = z_interpolated;
-                    overideColor = true;
-                }
-            }
-            xptr += step;
-            if(xptr > nextX){
-                yptr += step;
-                xptr = xptr -1;
+        if(insideTriangle(xptr, yptr, t.v)){
+            auto[alpha, beta, gamma] = computeBarycentric2D(xptr, yptr, t.v);
+            float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+            float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+            z_interpolated *= -w_reciprocal;
+            int index = get_ss_index(xptr, yptr); 
+            if(z_interpolated < ss_depth_buf[index]){
+                ss_depth_buf[index] = z_interpolated;
+                ss_frame_buf[index] = color;
             }
         }
-        assert(count == SSRATE);
-        if(overideColor){
-            Vector3f newColor = color*ptsInside/SSRATE + Vector3f(255,255,255)*(1-ptsInside/SSRATE);
-            set_pixel(Vector3f(xptr,yptr-1,0),newColor);
-        }
-        yptr -= 1;
-        xptr += 1;
+        xptr += step;
+        
         if(xptr > maxX){
             xptr = std::floor(minX) + 0.5*step;
-            yptr += 1;
+            yptr += step;
         }
-        // std::cout << "----END PIXEL------" << std::endl;
-    }      
+    }
     return;
 #endif
     
@@ -334,10 +221,16 @@ void rst::rasterizer::clear(rst::Buffers buff)
     if ((buff & rst::Buffers::Color) == rst::Buffers::Color)
     {
         std::fill(frame_buf.begin(), frame_buf.end(), Eigen::Vector3f{0, 0, 0});
+    #ifdef USE_SUPERSAMPLING
+        std::fill(ss_frame_buf.begin(), ss_frame_buf.end(), Eigen::Vector3f{0, 0, 0});
+    #endif
     }
     if ((buff & rst::Buffers::Depth) == rst::Buffers::Depth)
     {
         std::fill(depth_buf.begin(), depth_buf.end(), std::numeric_limits<float>::infinity());
+    #ifdef USE_SUPERSAMPLING
+        std::fill(ss_depth_buf.begin(), ss_depth_buf.end(), std::numeric_limits<float>::infinity());
+    #endif
     }
 }
 
@@ -345,7 +238,19 @@ rst::rasterizer::rasterizer(int w, int h) : width(w), height(h)
 {
     frame_buf.resize(w * h);
     depth_buf.resize(w * h);
+    #ifdef USE_SUPERSAMPLING
+        ssrate = SSRATE;
+        ss_frame_buf.resize(w * h * ssrate * ssrate);
+        ss_depth_buf.resize(w * h * ssrate * ssrate);
+    #endif
 }
+
+#ifdef USE_SUPERSAMPLING
+inline int rst::rasterizer::get_ss_index(float x, float y)
+{
+    return (y-0.5/(1.0*ssrate))*ssrate*ssrate*width + (x-0.5/(1.0*ssrate))*ssrate;
+}
+#endif
 
 int rst::rasterizer::get_index(int x, int y)
 {

@@ -1,3 +1,7 @@
 *.pdf
 build/
 .vscode/
+*.png
+*.jgp
+*.jpeg
+*.tiff

@@ -9,9 +9,9 @@
 #include "global.hpp"
 #include "Triangle.hpp"
 
-#define USE_SUPERSAMPLING 
+// #define USE_SUPERSAMPLING 
 #ifdef USE_SUPERSAMPLING
-    #define SSRATE 16
+    #define SSRATE 2
 #endif
 
 using namespace Eigen;
@@ -97,8 +97,15 @@ namespace rst
         std::map<int, std::vector<Eigen::Vector3f>> col_buf;
 
         std::vector<Eigen::Vector3f> frame_buf;
-
         std::vector<float> depth_buf;
+
+    #ifdef USE_SUPERSAMPLING
+        std::vector<Eigen::Vector3f> ss_frame_buf;
+        std::vector<float> ss_depth_buf;
+        int ssrate;
+        int get_ss_index(float x, float y);
+    #endif
+
         int get_index(int x, int y);
 
         int width, height;
