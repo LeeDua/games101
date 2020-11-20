@@ -9,7 +9,7 @@
 #include "global.hpp"
 #include "Triangle.hpp"
 
-// #define USE_SUPERSAMPLING 
+#define USE_SUPERSAMPLING 
 #ifdef USE_SUPERSAMPLING
     #define SSRATE 2
 #endif

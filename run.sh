@@ -1,7 +1,7 @@
 cd build
 rm -rf *
 cmake ..
-make -j10
+cmake --build /mnt/f/g101/build --config Release --target all -- -j 10
 cd ..
 ./build/Rasterizer
 
