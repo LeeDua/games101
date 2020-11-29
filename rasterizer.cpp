@@ -281,8 +281,10 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
     // iterate through the pixel and find if the current pixel is inside the triangle
     // TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
 
-    // const Vector3f color = t.getColor();
-    const Vector3f color(0.0,0.0,0.0);
+    // const Vector3f color(255.0,255.0,255.0);
+    Vector3f color,normal,point_pos;
+    Vector2f tex_coor;
+
     auto v = t.toVector4();
     float minX = width+1, minY = height+1, maxX = -1.0, maxY = -1.0;
     for(int i=0;i<3;i++){
@@ -314,8 +316,13 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
             z_interpolated *= -w_reciprocal;
             int index = get_ss_index(xptr, yptr); 
             if(z_interpolated < ss_depth_buf[index]){
+                color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], 1.0);
+                tex_coor = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1.0);
+                normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], 1.0);
+                fragment_shader_payload payload(color, normal, tex_coor, t.tex);
+                Vector3f result_color = fragment_shader(payload);
                 ss_depth_buf[index] = z_interpolated;
-                ss_frame_buf[index] = color;
+                ss_frame_buf[index] = result_color;
             }
         }
         xptr += step;
@@ -339,8 +346,17 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
             z_interpolated *= -w_reciprocal;
             int index = get_index(xptr, yptr);
             if(z_interpolated < depth_buf[index]){
-                depth_buf[index] = z_interpolated;
-                set_pixel(Vector2i(int(xptr),int(yptr)),color);
+                color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], 1.0);
+                tex_coor = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1.0);
+                normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], 1.0);
+                fragment_shader_payload payload(color, normal, tex_coor, t.tex);
+                
+                //set view_pos for phong frag shader
+                payload.view_pos = interpolate(alpha, beta, gamma, view_pos[0], view_pos[1], view_pos[2], 1.0);
+                
+                Vector3f result_color = fragment_shader(payload);
+                depth_buf[index] = z_interpolated;                
+                set_pixel(Vector2i(int(xptr),int(yptr)),result_color);
             }
         }        
         xptr += 1;
@@ -405,13 +421,15 @@ inline int rst::rasterizer::get_ss_index(float x, float y)
 
 int rst::rasterizer::get_index(int x, int y)
 {
-    return y*width + x;
+    return (height-1-y)*width + x;
 }
 
 void rst::rasterizer::set_pixel(const Vector2i &point, const Eigen::Vector3f &color)
 {
     //old index: auto ind = point.y() + point.x() * width;
-    int ind = (height-point.y())*width + point.x();
+    // int ind = (height-point.y())*width + point.x();
+    int ind = get_index(point.x(), point.y());
+
     frame_buf[ind] = color;
 }
 

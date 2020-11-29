@@ -64,7 +64,8 @@ Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float z
     
     float height = tan(degree_to_radius(eye_fov/2))*2.0*abs(zNear);
     float width = aspect_ratio*height;
-
+    zNear = -zNear;
+    zFar = -zFar;
     projection << 
         zNear, 0, 0, 0,
         0,zNear,0,0,
@@ -163,13 +164,16 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
     Eigen::Vector3f normal = payload.normal;
 
     Eigen::Vector3f result_color = {0, 0, 0};
+    
+    result_color += ka.cwiseProduct(amb_light_intensity);
     for (auto& light : lights)
     {
-        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
-        // components are. Then, accumulate that result on the *result_color* object.
-        
+        Vector3f light_from_pt = light.position - point;
+        Vector3f view_from_pt = eye_pos - point;
+        result_color += kd.cwiseProduct(light.intensity) / (light_from_pt.dot(light_from_pt)) * std::max(0.f, normal.normalized().dot(light_from_pt.normalized()));
+        Vector3f h = view_from_pt + light_from_pt;
+        result_color += ks.cwiseProduct(light.intensity) / light_from_pt.dot(light_from_pt) * pow(std::max(0.f, normal.normalized().dot(h.normalized())), p);
     }
-
     return result_color * 255.f;
 }
 
@@ -281,12 +285,13 @@ int main(int argc, const char** argv)
         for(int i=0;i<mesh.Vertices.size();i+=3)
         {
             Triangle* t = new Triangle();
+
             for(int j=0;j<3;j++)
             {
                 t->setVertex(j,Vector4f(mesh.Vertices[i+j].Position.X,mesh.Vertices[i+j].Position.Y,mesh.Vertices[i+j].Position.Z,1.0));
                 t->setNormal(j,Vector3f(mesh.Vertices[i+j].Normal.X,mesh.Vertices[i+j].Normal.Y,mesh.Vertices[i+j].Normal.Z));
                 t->setTexCoord(j,Vector2f(mesh.Vertices[i+j].TextureCoordinate.X, mesh.Vertices[i+j].TextureCoordinate.Y));
-    }
+            }
             TriangleList.push_back(t);
         }
     }

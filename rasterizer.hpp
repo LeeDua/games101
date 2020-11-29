@@ -11,9 +11,9 @@
 #include "Shader.hpp"
 #include "Triangle.hpp"
 
-#define USE_SUPERSAMPLING 
+// #define USE_SUPERSAMPLING 
 #ifdef USE_SUPERSAMPLING
-    #define SSRATE 2
+    #define SSRATE 4
 #endif
 
 using namespace Eigen;
