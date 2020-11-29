@@ -349,7 +349,8 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
                 color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], 1.0);
                 tex_coor = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1.0);
                 normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], 1.0);
-                fragment_shader_payload payload(color, normal, tex_coor, t.tex);
+                Texture* tex = texture.has_value() ? &texture.value() : nullptr;
+                fragment_shader_payload payload(color, normal, tex_coor, tex);
                 
                 //set view_pos for phong frag shader
                 payload.view_pos = interpolate(alpha, beta, gamma, view_pos[0], view_pos[1], view_pos[2], 1.0);
