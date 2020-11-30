@@ -40,15 +40,40 @@ cv::Point2f recursive_bezier(const std::vector<cv::Point2f> &control_points, flo
     return recursive_bezier(c_pts, t);
 }
 
+inline float dist_square(float x, float y, float a, float b){
+    // try out different dist smoothing
+    // return pow((x - a) * (x - a) + (y - b) * (y - b) + 1.f, 2.f);
+    // return exp((x - a) * (x - a) + (y - b) * (y - b));
+    return (x - a) * (x - a) + (y - b) * (y - b) + 1.f;
+}
+
 void bezier(const std::vector<cv::Point2f> &control_points, cv::Mat &window) 
 {
     // TODO: Iterate through all t = 0 to t = 1 with small steps, and call de Casteljau's 
     // recursive Bezier algorithm.
-    for(float t=0.f; t <= 1.f; t += 0.01){
+    cv::Mat buffer(window);
+    std::vector<cv::Point2f> pts;
+    for(float t = 0.f; t <= 1.f; t += 0.001){
         cv::Point2f point = recursive_bezier(control_points, t);
-        window.at<cv::Vec3b>(point.y, point.x)[1] = 255;
+        pts.push_back(point);
+        buffer.at<cv::Vec3b>(point.y, point.x)[1] = 255;
     }
 
+    //anti aliasing, do not deal with corner cases
+    for(float t = 0.f; t <= 1.f; t += 0.001){
+        cv::Point2f point = pts[t * 1000.f];
+        float dist_square_sum = 0.f;
+        for( int di=-1; di<=1; di++){
+            for( int dj=-1; dj<=1; dj++){
+                if( (di == -1 || di ==1 ) && dj != 0) continue;
+                if( (dj == -1 || dj ==1 ) && di != 0) continue;
+                float dist = dist_square(point.y, point.x, floor(point.y) + .5f + di, floor(point.x) + .5f + dj);
+                dist_square_sum += 1 / dist;
+                window.at<cv::Vec3b>(point.y, point.x) += 1 / dist * buffer.at<cv::Vec3b>(point.y + di, point.x + dj);
+            }
+        }
+        window.at<cv::Vec3b>(point.y, point.x) /= dist_square_sum;
+    }
 }
 
 int main() 
@@ -69,7 +94,7 @@ int main()
 
         if (control_points.size() == 4) 
         {
-            naive_bezier(control_points, window);
+            // naive_bezier(control_points, window);
             bezier(control_points, window);
 
             cv::imshow("Bezier Curve", window);
